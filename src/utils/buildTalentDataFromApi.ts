@@ -396,6 +396,17 @@ const getChainTargets = (spell: ApiSpellRow | undefined, idx: number): number =>
   return toNum(a ?? b ?? 0, 0);
 };
 
+const getEffectPointsPerResource = (
+  spell: ApiSpellRow | undefined,
+  idx: number
+): number => {
+  if (!spell) return NaN;
+
+  const a = spell[`EffectPointsPerResource_${idx}`];
+  const b = spell[`EffectPointsPerResource${idx}`];
+  return toNum(a ?? b, NaN);
+};
+
 // -------- SpellDescriptionVariables --------
 const getDescVarsString = (row?: ApiDescVarRow) =>
   String(
@@ -657,6 +668,20 @@ out = out.replace(
 
     const ticks = Math.max(1, Math.floor(durationMs / 1000 / periodSec));
     return String(base * ticks);
+  });
+
+  // $bX (EffectPointsPerResource)
+  out = out.replace(/\$(\d+)?b(\d+)/g, (m, spellIdStr, idxStr) => {
+    const idx = toNum(idxStr, 0);
+    if (idx < 1 || idx > MAX_EFFECTS) return m;
+
+    const spell = getSpell(spellIdStr);
+    if (!spell) return m;
+
+    const val = getEffectPointsPerResource(spell, idx);
+    if (Number.isFinite(val)) return formatScaled(val);
+
+    return formatEffectDisplayText(spell, idx);
   });
 
   // $lX:Y; plurality helper based on the most recent numeric value.
