@@ -232,8 +232,32 @@ const powerTypeToLabel = (powerType: number): string => {
   }
 };
 
+const getAttr0 = (spell: ApiSpellRow | undefined): number => {
+  if (!spell) return 0;
+
+  return toNum(
+    spell.Attributes ??
+      spell.attributes ??
+      spell.SpellAttributes ??
+      spell.spellAttributes ??
+      spell.Attributes_0 ??
+      spell.Attributes0 ??
+      spell.attributes_0 ??
+      spell.attributes0 ??
+      0,
+    0,
+  );
+};
+
+const isPassiveSpell = (spell: ApiSpellRow | undefined): boolean => {
+  const attr0 = getAttr0(spell);
+  // SpellAttr0::PASSIVE (0x00000040)
+  return (attr0 & 0x40) !== 0;
+};
+
 const buildSpellHeader = (spell: ApiSpellRow | undefined): string => {
   if (!spell) return "";
+  if (isPassiveSpell(spell)) return "";
 
   const powerType = toNum(spell.PowerType ?? spell.powerType ?? 0, 0);
   const powerLabel = powerTypeToLabel(powerType);
