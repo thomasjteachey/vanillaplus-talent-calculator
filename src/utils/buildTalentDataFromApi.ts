@@ -531,31 +531,35 @@ const resolveSpellDescription = (
     }
   );
 
-// Lettered scaled tokens - tolerant of case + optional '$' before the identifier
-// Supports:
-//   $/1000;$s1
-//   $/1000;S1
-//   $/100;  $12345S2
-//   $/10;h3
-out = out.replace(
-  /\$\/\s*(10|100|1000)\s*;\s*\$?\s*(\d+)?\s*([sSmMhHnNuU])\s*(\d+)/g,
-  (m, divStr, spellIdStr, _letter, idxStr) => {
-    const div = toNum(divStr, 1);
-    const idx = toNum(idxStr, 0);
-    if (!div || idx < 1 || idx > 3) return m;
+  // Lettered scaled tokens - tolerant of case + optional '$' before the identifier
+  // Supports:
+  //   $/1000;$s1
+  //   $/1000;S1
+  //   $/100;  $12345S2
+  //   $/10;h3
+  out = out.replace(
+    /\$\/\s*(10|100|1000)\s*;\s*\$?\s*(\d+)?\s*([sSmMhHnNuU])\s*(\d+)/g,
+    (m, divStr, spellIdStr, _letter, idxStr) => {
+      const div = toNum(divStr, 1);
+      const idx = toNum(idxStr, 0);
+      if (!div || idx < 1 || idx > 3) return m;
 
-    const spell =
-      spellIdStr && String(spellIdStr).length > 0
-        ? spellsById.get(toNum(spellIdStr))
-        : currentSpell;
+      const spell =
+        spellIdStr && String(spellIdStr).length > 0
+          ? spellsById.get(toNum(spellIdStr))
+          : currentSpell;
 
-    if (!spell) return m;
+      if (!spell) return m;
 
-    // Keep consistent with Blizzard-style $s logic
-    const val = getEffectDisplayValue(spell, idx).display;
-    return formatScaled(val / div);
-  }
-);
+      // Prefer explicit SpellDescriptionVariables when present on the referenced spell
+      const dv = getDescVarValue(spell, idx, descVarsById);
+      if (Number.isFinite(dv)) return formatScaled(dv / div);
+
+      // Keep consistent with Blizzard-style $s logic when desc vars are absent
+      const val = getEffectDisplayValue(spell, idx).display;
+      return formatScaled(val / div);
+    }
+  );
 
   // Optional plain numeric $1 $2 if they appear alone
   // Only replace when NOT followed by a letter (avoid clobbering $123s1).
