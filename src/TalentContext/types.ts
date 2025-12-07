@@ -34,7 +34,7 @@ interface Talent {
   name: string;
   pos: Position;
   icon: string;
-  description: (points: number) => string;
+  description: (points: number) => { header?: string; text: string };
   maxRank: number;
   reqPoints: number;
   prereq?: string;

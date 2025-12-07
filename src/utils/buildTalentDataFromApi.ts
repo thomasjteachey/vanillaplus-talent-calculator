@@ -206,6 +206,91 @@ const formatYards = (v: number): string => {
   return Number.isInteger(rounded) ? String(rounded) : String(rounded);
 };
 
+const formatSecondsFromMs = (ms: number): string => {
+  if (!ms) return "0 sec";
+  const sec = Math.round(ms / 1000);
+  if (sec < 60) return `${sec} sec`;
+  const min = Math.floor(sec / 60);
+  const rem = sec % 60;
+  return rem ? `${min} min ${rem} sec` : `${min} min`;
+};
+
+const powerTypeToLabel = (powerType: number): string => {
+  switch (powerType) {
+    case 1:
+      return "Rage";
+    case 2:
+      return "Focus";
+    case 3:
+      return "Energy";
+    case 6:
+      return "Runes";
+    case 7:
+      return "Runic Power";
+    default:
+      return "Mana";
+  }
+};
+
+const buildSpellHeader = (spell: ApiSpellRow | undefined): string => {
+  if (!spell) return "";
+
+  const powerType = toNum(spell.PowerType ?? spell.powerType ?? 0, 0);
+  const powerLabel = powerTypeToLabel(powerType);
+
+  const manaPct = toNum(
+    spell.ManaCostPercentage ??
+      spell.ManaCostPct ??
+      spell.manaCostPercentage ??
+      spell.manaCostPct ??
+      0,
+    0,
+  );
+  const manaFlat = toNum(spell.ManaCost ?? spell.manaCost ?? 0, 0);
+  const manaPerSec = toNum(
+    spell.ManaPerSecond ?? spell.manaPerSecond ?? 0,
+    0,
+  );
+
+  const minRange = toNum(spell.MinRange ?? spell.minRange ?? 0, 0);
+  const maxRange = toNum(
+    spell.MaxRange ??
+      spell.maxRange ??
+      spell.Range ??
+      spell.range ??
+      0,
+    0,
+  );
+
+  const cooldownMs = Math.max(
+    toNum(spell.RecoveryTime ?? spell.recoveryTime ?? 0, 0),
+    toNum(spell.CategoryRecoveryTime ?? spell.categoryRecoveryTime ?? 0, 0),
+  );
+
+  const castMs = toNum(spell.CastTime ?? spell.castTime ?? 0, 0);
+
+  const parts: string[] = [];
+
+  if (manaPct) parts.push(`${manaPct}% of base ${powerLabel}`);
+  else if (manaFlat) parts.push(`${manaFlat} ${powerLabel}`);
+
+  if (manaPerSec) parts.push(`${manaPerSec} ${powerLabel} per sec`);
+
+  if (maxRange) {
+    const rangeLabel = minRange
+      ? `${minRange}-${maxRange} yd range`
+      : `${maxRange} yd range`;
+    parts.push(rangeLabel);
+  }
+
+  if (castMs) parts.push(`${formatSecondsFromMs(castMs)} cast`);
+  else parts.push("Instant");
+
+  if (cooldownMs) parts.push(`${formatSecondsFromMs(cooldownMs)} cooldown`);
+
+  return parts.join("\n").trim();
+};
+
 // -------- Base points --------
 const getEffectDiceSides = (spell: ApiSpellRow | undefined, idx: number): number => {
   if (!spell) return 0;
@@ -714,8 +799,9 @@ export const buildTalentDataFromApi = (api: ApiResponse): TalentData => {
         const spell = sid ? spellsById.get(sid) : undefined;
 
         const rawDesc = getSpellDescRaw(spell) || getAuraDescRaw(spell);
+        const header = buildSpellHeader(spell);
 
-        return resolveSpellDescription(
+        const resolved = resolveSpellDescription(
           rawDesc,
           spell,
           spellsById,
@@ -723,6 +809,8 @@ export const buildTalentDataFromApi = (api: ApiResponse): TalentData => {
           radiiById,
           descVarsById
         );
+
+        return header ? { header, text: resolved } : { text: resolved };
       };
 
       // Prereq support (best-effort)
