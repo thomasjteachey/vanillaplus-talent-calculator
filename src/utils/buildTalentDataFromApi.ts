@@ -226,71 +226,33 @@ const getEffectBasePoints = (spell: ApiSpellRow | undefined, idx: number): numbe
 const getEffectDisplayValue = (
   spell: ApiSpellRow | undefined,
   idx: number
-): { min: number; max: number; display: number } => {
+): { min: number; max: number; display: number; hasRandom: boolean } => {
   const base = getEffectBasePoints(spell, idx);
   const dieSides = getEffectDiceSides(spell, idx);
-  const hasRandom = dieSides > 1;
+  const hasRandom = dieSides > 0;
 
-  // In WoW data, EffectBasePoints already holds the deterministic amount.
-  // Die sides only adds a random spread when it exceeds one. Avoid the +1
-  // TrinityCore server-side offset here to keep tooltips identical to client
-  // strings.
-  const min = base;
-  const max = base + (hasRandom ? dieSides - 1 : 0);
+  // TrinityCore uses basePoints + rand(0..dieSides) (+1 when dieSides == 0).
+  // For tooltips we surface the upper bound when randomness exists so $s/$m
+  // tokens match the in-game expectation of showing the highest roll.
+  const min = base + 1;
+  const max = base + (hasRandom ? dieSides : 0);
 
   const valueForTooltip = hasRandom ? max : min;
   const display = Math.abs(valueForTooltip);
 
-  return { min, max, display };
+  return { min, max, display, hasRandom };
 };
 
-const getProcChance = (spell: ApiSpellRow | undefined): number => {
-  if (!spell) return 0;
-
-  const chance = toNum(spell.ProcChance ?? spell.procChance ?? 0, 0);
-  const ppm = toNum(spell.ProcBasePPM ?? spell.procBasePPM ?? 0, 0);
-
-  if (chance > 0) return chance;
-  if (ppm > 0) return ppm;
-  return 0;
-};
-
-const getProcCharges = (spell: ApiSpellRow | undefined): number => {
-  if (!spell) return 0;
-  return toNum(spell.ProcCharges ?? spell.procCharges ?? 0, 0);
-};
-
-const getStackAmount = (spell: ApiSpellRow | undefined): number => {
-  if (!spell) return 0;
-  return toNum(
-    spell.StackAmount ?? spell.stackAmount ?? spell.CumulativeAura ?? spell.cumulativeAura ?? 0,
-    0
-  );
-};
-
-const getChainTargets = (spell: ApiSpellRow | undefined, idx: number): number => {
-  if (!spell) return 0;
-
-  const a = spell[`EffectChainTarget_${idx}`];
-  const b = spell[`EffectChainTarget${idx}`];
-  return toNum(a ?? b ?? 0, 0);
-};
-
-const getEffectDisplayValue = (
+const formatEffectDisplayText = (
   spell: ApiSpellRow | undefined,
   idx: number
-): { min: number; max: number; display: number } => {
-  const basePlusOne = getBasePointsPlusOne(spell, idx);
-  const dieSides = getEffectDiceSides(spell, idx);
+): string => {
+  const { min, max } = getEffectDisplayValue(spell, idx);
+  const minAbs = Math.abs(min);
+  const maxAbs = Math.abs(max);
 
-  const hasRandom = dieSides > 0;
-  const max = basePlusOne + (hasRandom ? dieSides : 0);
-  const min = basePlusOne;
-
-  const valueForTooltip = hasRandom ? max : min;
-  const display = Math.abs(valueForTooltip);
-
-  return { min, max, display };
+  if (min === max) return String(minAbs);
+  return `${minAbs} to ${maxAbs}`;
 };
 
 const getProcChance = (spell: ApiSpellRow | undefined): number => {
@@ -477,7 +439,7 @@ out = out.replace(
     const spell = getSpell(spellIdStr);
     if (!spell) return m;
 
-    return String(getEffectDisplayValue(spell, idx).display);
+    return formatEffectDisplayText(spell, idx);
   });
 
   // $mX / $<id>mX (best-effort = basepoints)
@@ -488,7 +450,7 @@ out = out.replace(
     const spell = getSpell(spellIdStr);
     if (!spell) return m;
 
-    return String(getEffectDisplayValue(spell, idx).display);
+    return formatEffectDisplayText(spell, idx);
   });
 
 // $h / $h1..3 / $123h1..3
@@ -533,7 +495,7 @@ out = out.replace(
       if (stacks) return String(stacks);
     }
 
-    return String(getEffectDisplayValue(spell, idx).display);
+    return formatEffectDisplayText(spell, idx);
   }
 );
 
@@ -578,7 +540,7 @@ out = out.replace(
     const spell = getSpell(spellIdStr);
     if (!spell) return m;
 
-    const base = getEffectDisplayValue(spell, idx).display;
+    const { display: base } = getEffectDisplayValue(spell, idx);
     const periodSec = getPeriodSeconds(spell, idx);
     const durationMs = getDurationMsForSpell(spell, durationsById);
 
@@ -586,6 +548,16 @@ out = out.replace(
 
     const ticks = Math.max(1, Math.floor(durationMs / 1000 / periodSec));
     return String(base * ticks);
+  });
+
+  // $lX:Y; plurality helper based on the most recent numeric value.
+  out = out.replace(/\$l([^:;]+):([^;]+);/g, (m, singular, plural, offset, str) => {
+    const before = str.slice(0, offset);
+    const match = before.match(/(-?\d+(?:\.\d+)?)(?!.*-?\d)/);
+    const val = match ? toNum(match[1], NaN) : NaN;
+
+    if (Number.isFinite(val) && val === 1) return singular;
+    return plural;
   });
 
   return normalizeLineBreaks(out);
