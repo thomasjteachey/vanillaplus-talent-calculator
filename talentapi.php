@@ -326,6 +326,14 @@ foreach ($spellsById as $s) {
             if ($sid > 0) $referenced[$sid] = true;
         }
     }
+
+    // Also capture numeric spell references inside scaled tokens like $/10;12345s1
+    if (preg_match_all('/\$\s*\/\s*(?:10|100|1000)\s*;\s*\$?\s*(\d+)/i', $desc, $mScaled)) {
+        foreach ($mScaled[1] as $idStr) {
+            $sid = (int)$idStr;
+            if ($sid > 0) $referenced[$sid] = true;
+        }
+    }
 }
 
 $missing = array();

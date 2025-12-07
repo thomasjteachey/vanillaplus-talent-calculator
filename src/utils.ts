@@ -6,7 +6,7 @@ export const talentText = (
   expressions.forEach((expression, i) => {
     result.push(expression[rank - 1].toString(), string[i + 1]);
   });
-  return result.join("");
+  return { text: result.join("") };
 };
 
 export const requireAll = (

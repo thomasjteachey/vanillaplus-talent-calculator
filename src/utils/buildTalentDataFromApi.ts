@@ -206,6 +206,115 @@ const formatYards = (v: number): string => {
   return Number.isInteger(rounded) ? String(rounded) : String(rounded);
 };
 
+const formatSecondsFromMs = (ms: number): string => {
+  if (!ms) return "0 sec";
+  const sec = Math.round(ms / 1000);
+  if (sec < 60) return `${sec} sec`;
+  const min = Math.floor(sec / 60);
+  const rem = sec % 60;
+  return rem ? `${min} min ${rem} sec` : `${min} min`;
+};
+
+const powerTypeToLabel = (powerType: number): string => {
+  switch (powerType) {
+    case 1:
+      return "Rage";
+    case 2:
+      return "Focus";
+    case 3:
+      return "Energy";
+    case 6:
+      return "Runes";
+    case 7:
+      return "Runic Power";
+    default:
+      return "Mana";
+  }
+};
+
+const getAttr0 = (spell: ApiSpellRow | undefined): number => {
+  if (!spell) return 0;
+
+  return toNum(
+    spell.Attributes ??
+      spell.attributes ??
+      spell.SpellAttributes ??
+      spell.spellAttributes ??
+      spell.Attributes_0 ??
+      spell.Attributes0 ??
+      spell.attributes_0 ??
+      spell.attributes0 ??
+      0,
+    0,
+  );
+};
+
+const isPassiveSpell = (spell: ApiSpellRow | undefined): boolean => {
+  const attr0 = getAttr0(spell);
+  // SpellAttr0::PASSIVE (0x00000040)
+  return (attr0 & 0x40) !== 0;
+};
+
+const buildSpellHeader = (spell: ApiSpellRow | undefined): string => {
+  if (!spell) return "";
+  if (isPassiveSpell(spell)) return "";
+
+  const powerType = toNum(spell.PowerType ?? spell.powerType ?? 0, 0);
+  const powerLabel = powerTypeToLabel(powerType);
+
+  const manaPct = toNum(
+    spell.ManaCostPercentage ??
+      spell.ManaCostPct ??
+      spell.manaCostPercentage ??
+      spell.manaCostPct ??
+      0,
+    0,
+  );
+  const manaFlat = toNum(spell.ManaCost ?? spell.manaCost ?? 0, 0);
+  const manaPerSec = toNum(
+    spell.ManaPerSecond ?? spell.manaPerSecond ?? 0,
+    0,
+  );
+
+  const minRange = toNum(spell.MinRange ?? spell.minRange ?? 0, 0);
+  const maxRange = toNum(
+    spell.MaxRange ??
+      spell.maxRange ??
+      spell.Range ??
+      spell.range ??
+      0,
+    0,
+  );
+
+  const cooldownMs = Math.max(
+    toNum(spell.RecoveryTime ?? spell.recoveryTime ?? 0, 0),
+    toNum(spell.CategoryRecoveryTime ?? spell.categoryRecoveryTime ?? 0, 0),
+  );
+
+  const castMs = toNum(spell.CastTime ?? spell.castTime ?? 0, 0);
+
+  const parts: string[] = [];
+
+  if (manaPct) parts.push(`${manaPct}% of base ${powerLabel}`);
+  else if (manaFlat) parts.push(`${manaFlat} ${powerLabel}`);
+
+  if (manaPerSec) parts.push(`${manaPerSec} ${powerLabel} per sec`);
+
+  if (maxRange) {
+    const rangeLabel = minRange
+      ? `${minRange}-${maxRange} yd range`
+      : `${maxRange} yd range`;
+    parts.push(rangeLabel);
+  }
+
+  if (castMs) parts.push(`${formatSecondsFromMs(castMs)} cast`);
+  else parts.push("Instant");
+
+  if (cooldownMs) parts.push(`${formatSecondsFromMs(cooldownMs)} cooldown`);
+
+  return parts.join("\n").trim();
+};
+
 // -------- Base points --------
 const getEffectDiceSides = (spell: ApiSpellRow | undefined, idx: number): number => {
   if (!spell) return 0;
@@ -285,6 +394,35 @@ const getChainTargets = (spell: ApiSpellRow | undefined, idx: number): number =>
   const a = spell[`EffectChainTarget_${idx}`];
   const b = spell[`EffectChainTarget${idx}`];
   return toNum(a ?? b ?? 0, 0);
+};
+
+const getEffectPointsPerResource = (
+  spell: ApiSpellRow | undefined,
+  idx: number
+): number => {
+  if (!spell) return NaN;
+
+  const candidates = [
+    spell[`EffectPointsPerResource_${idx}`],
+    spell[`EffectPointsPerResource${idx}`],
+    spell[`EffectPointsPerCombo_${idx}`],
+    spell[`EffectPointsPerCombo${idx}`],
+    spell[`EffectPointsPerComboPoint_${idx}`],
+    spell[`EffectPointsPerComboPoint${idx}`],
+    spell[`effectPointsPerResource_${idx}`],
+    spell[`effectPointsPerResource${idx}`],
+    spell[`effectPointsPerCombo_${idx}`],
+    spell[`effectPointsPerCombo${idx}`],
+    spell[`effectPointsPerComboPoint_${idx}`],
+    spell[`effectPointsPerComboPoint${idx}`],
+  ];
+
+  for (let i = 0; i < candidates.length; i++) {
+    const n = toNum(candidates[i], NaN);
+    if (Number.isFinite(n)) return n;
+  }
+
+  return NaN;
 };
 
 // -------- SpellDescriptionVariables --------
@@ -393,31 +531,35 @@ const resolveSpellDescription = (
     }
   );
 
-// Lettered scaled tokens - tolerant of case + optional '$' before the identifier
-// Supports:
-//   $/1000;$s1
-//   $/1000;S1
-//   $/100;  $12345S2
-//   $/10;h3
-out = out.replace(
-  /\$\/\s*(10|100|1000)\s*;\s*\$?\s*(\d+)?\s*([sSmMhHnNuU])\s*(\d+)/g,
-  (m, divStr, spellIdStr, _letter, idxStr) => {
-    const div = toNum(divStr, 1);
-    const idx = toNum(idxStr, 0);
-    if (!div || idx < 1 || idx > 3) return m;
+  // Lettered scaled tokens - tolerant of case + optional '$' before the identifier
+  // Supports:
+  //   $/1000;$s1
+  //   $/1000;S1
+  //   $/100;  $12345S2
+  //   $/10;h3
+  out = out.replace(
+    /\$\/\s*(10|100|1000)\s*;\s*\$?\s*(\d+)?\s*([sSmMhHnNuU])\s*(\d+)/g,
+    (m, divStr, spellIdStr, _letter, idxStr) => {
+      const div = toNum(divStr, 1);
+      const idx = toNum(idxStr, 0);
+      if (!div || idx < 1 || idx > 3) return m;
 
-    const spell =
-      spellIdStr && String(spellIdStr).length > 0
-        ? spellsById.get(toNum(spellIdStr))
-        : currentSpell;
+      const spell =
+        spellIdStr && String(spellIdStr).length > 0
+          ? spellsById.get(toNum(spellIdStr))
+          : currentSpell;
 
-    if (!spell) return m;
+      if (!spell) return m;
 
-    // Keep consistent with Blizzard-style $s logic
-    const val = getEffectDisplayValue(spell, idx).display;
-    return formatScaled(val / div);
-  }
-);
+      // Prefer explicit SpellDescriptionVariables when present on the referenced spell
+      const dv = getDescVarValue(spell, idx, descVarsById);
+      if (Number.isFinite(dv)) return formatScaled(dv / div);
+
+      // Keep consistent with Blizzard-style $s logic when desc vars are absent
+      const val = getEffectDisplayValue(spell, idx).display;
+      return formatScaled(val / div);
+    }
+  );
 
   // Optional plain numeric $1 $2 if they appear alone
   // Only replace when NOT followed by a letter (avoid clobbering $123s1).
@@ -548,6 +690,20 @@ out = out.replace(
 
     const ticks = Math.max(1, Math.floor(durationMs / 1000 / periodSec));
     return String(base * ticks);
+  });
+
+  // $bX (EffectPointsPerResource)
+  out = out.replace(/\$(\d+)?b(\d+)/g, (m, spellIdStr, idxStr) => {
+    const idx = toNum(idxStr, 0);
+    if (idx < 1 || idx > MAX_EFFECTS) return m;
+
+    const spell = getSpell(spellIdStr);
+    if (!spell) return m;
+
+    const val = getEffectPointsPerResource(spell, idx);
+    if (Number.isFinite(val)) return formatScaled(val);
+
+    return formatEffectDisplayText(spell, idx);
   });
 
   // $lX:Y; plurality helper based on the most recent numeric value.
@@ -714,8 +870,9 @@ export const buildTalentDataFromApi = (api: ApiResponse): TalentData => {
         const spell = sid ? spellsById.get(sid) : undefined;
 
         const rawDesc = getSpellDescRaw(spell) || getAuraDescRaw(spell);
+        const header = buildSpellHeader(spell);
 
-        return resolveSpellDescription(
+        const resolved = resolveSpellDescription(
           rawDesc,
           spell,
           spellsById,
@@ -723,6 +880,8 @@ export const buildTalentDataFromApi = (api: ApiResponse): TalentData => {
           radiiById,
           descVarsById
         );
+
+        return header ? { header, text: resolved } : { text: resolved };
       };
 
       // Prereq support (best-effort)
