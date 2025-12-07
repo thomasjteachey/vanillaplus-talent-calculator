@@ -402,9 +402,23 @@ const getEffectPointsPerResource = (
 ): number => {
   if (!spell) return NaN;
 
-  const a = spell[`EffectPointsPerResource_${idx}`];
-  const b = spell[`EffectPointsPerResource${idx}`];
-  return toNum(a ?? b, NaN);
+  const candidates = [
+    spell[`EffectPointsPerResource_${idx}`],
+    spell[`EffectPointsPerResource${idx}`],
+    spell[`EffectPointsPerComboPoint_${idx}`],
+    spell[`EffectPointsPerComboPoint${idx}`],
+    spell[`effectPointsPerResource_${idx}`],
+    spell[`effectPointsPerResource${idx}`],
+    spell[`effectPointsPerComboPoint_${idx}`],
+    spell[`effectPointsPerComboPoint${idx}`],
+  ];
+
+  for (let i = 0; i < candidates.length; i++) {
+    const n = toNum(candidates[i], NaN);
+    if (Number.isFinite(n)) return n;
+  }
+
+  return NaN;
 };
 
 // -------- SpellDescriptionVariables --------
