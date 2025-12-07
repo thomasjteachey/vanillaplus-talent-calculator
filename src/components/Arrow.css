@@ -14,7 +14,7 @@
 
 .Arrow--left {
   height: 100%;
-  background-size: auto var(--arrow-thickness);
+  background-size: 100% var(--arrow-thickness);
   background-repeat: no-repeat;
   background-position: left;
 }
@@ -26,7 +26,7 @@
 
 .Arrow--right {
   height: 100%;
-  background-size: auto var(--arrow-thickness);
+  background-size: 100% var(--arrow-thickness);
   background-repeat: no-repeat;
   background-position: right;
 }
@@ -38,7 +38,7 @@
 
 .Arrow--down {
   height: 100%;
-  background-size: var(--arrow-thickness) auto;
+  background-size: var(--arrow-thickness) 100%;
   background-repeat: no-repeat;
   background-position: bottom;
 }
@@ -50,7 +50,7 @@
 
 .Arrow--right-down {
   height: 100%;
-  background-size: auto var(--arrow-thickness);
+  background-size: 100% var(--arrow-thickness);
   background-repeat: no-repeat;
   background-position: right;
 }
@@ -62,7 +62,7 @@
 
 .Arrow--right-down-down {
   height: 100%;
-  background-size: var(--arrow-thickness) auto;
+  background-size: var(--arrow-thickness) 100%;
   background-repeat: no-repeat;
   background-position: bottom;
 }
