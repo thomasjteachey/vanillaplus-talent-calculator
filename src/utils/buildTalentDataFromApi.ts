@@ -276,6 +276,55 @@ const getChainTargets = (spell: ApiSpellRow | undefined, idx: number): number =>
   return toNum(a ?? b ?? 0, 0);
 };
 
+const getEffectDisplayValue = (
+  spell: ApiSpellRow | undefined,
+  idx: number
+): { min: number; max: number; display: number } => {
+  const basePlusOne = getBasePointsPlusOne(spell, idx);
+  const dieSides = getEffectDiceSides(spell, idx);
+
+  const hasRandom = dieSides > 0;
+  const max = basePlusOne + (hasRandom ? dieSides : 0);
+  const min = basePlusOne;
+
+  const valueForTooltip = hasRandom ? max : min;
+  const display = Math.abs(valueForTooltip);
+
+  return { min, max, display };
+};
+
+const getProcChance = (spell: ApiSpellRow | undefined): number => {
+  if (!spell) return 0;
+
+  const chance = toNum(spell.ProcChance ?? spell.procChance ?? 0, 0);
+  const ppm = toNum(spell.ProcBasePPM ?? spell.procBasePPM ?? 0, 0);
+
+  if (chance > 0) return chance;
+  if (ppm > 0) return ppm;
+  return 0;
+};
+
+const getProcCharges = (spell: ApiSpellRow | undefined): number => {
+  if (!spell) return 0;
+  return toNum(spell.ProcCharges ?? spell.procCharges ?? 0, 0);
+};
+
+const getStackAmount = (spell: ApiSpellRow | undefined): number => {
+  if (!spell) return 0;
+  return toNum(
+    spell.StackAmount ?? spell.stackAmount ?? spell.CumulativeAura ?? spell.cumulativeAura ?? 0,
+    0
+  );
+};
+
+const getChainTargets = (spell: ApiSpellRow | undefined, idx: number): number => {
+  if (!spell) return 0;
+
+  const a = spell[`EffectChainTarget_${idx}`];
+  const b = spell[`EffectChainTarget${idx}`];
+  return toNum(a ?? b ?? 0, 0);
+};
+
 // -------- SpellDescriptionVariables --------
 const getDescVarsString = (row?: ApiDescVarRow) =>
   String(
