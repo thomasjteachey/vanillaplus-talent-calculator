@@ -10,6 +10,11 @@
   white-space: pre-wrap;
 }
 
+.TalentTooltip-spellHeader {
+  color: #fff;
+  white-space: pre-wrap;
+}
+
 .TalentTooltip-title {
   font-size: 1rem;
 }
