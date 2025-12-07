@@ -32,6 +32,15 @@ export const TalentTooltip = React.forwardRef<HTMLDivElement, Props>(
     const prereqMet = isPrereqMet(state, data, tree, name);
     const unlocked = isTalentUnlocked(state, data, tree, name);
 
+    const renderDescription = (desc: { header?: string; text: string }) => (
+      <>
+        {desc.header && (
+          <p className="TalentTooltip-spellHeader">{desc.header}</p>
+        )}
+        <p className="TalentTooltip-description">{desc.text}</p>
+      </>
+    );
+
     return (
       <Tooltip ref={ref} contentClassName="TalentTooltip-content" {...rest}>
         <h1 className="TalentTooltip-title">{name}</h1>
@@ -49,18 +58,16 @@ export const TalentTooltip = React.forwardRef<HTMLDivElement, Props>(
             {prereqData.maxRank > 1 ? "s" : ""} in {prereqData.name}
           </p>
         )}
-        <p className="TalentTooltip-description">
-          {rank === 0
+        {renderDescription(
+          rank === 0
             ? talentData.description(rank + 1)
-            : talentData.description(rank)}
-        </p>
+            : talentData.description(rank)
+        )}
         {rank !== 0 && rank < talentData.maxRank && (
           <>
             <br />
             <p>Next rank:</p>
-            <p className="TalentTooltip-description">
-              {talentData.description(rank + 1)}
-            </p>
+            {renderDescription(talentData.description(rank + 1))}
           </>
         )}
         {rank > 0 && (

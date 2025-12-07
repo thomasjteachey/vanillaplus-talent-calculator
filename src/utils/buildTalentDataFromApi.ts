@@ -810,7 +810,7 @@ export const buildTalentDataFromApi = (api: ApiResponse): TalentData => {
           descVarsById
         );
 
-        return header ? `${header}\n\n${resolved}` : resolved;
+        return header ? { header, text: resolved } : { text: resolved };
       };
 
       // Prereq support (best-effort)
