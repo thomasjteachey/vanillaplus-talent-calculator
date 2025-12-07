@@ -229,63 +229,13 @@ const getEffectDisplayValue = (
 ): { min: number; max: number; display: number } => {
   const base = getEffectBasePoints(spell, idx);
   const dieSides = getEffectDiceSides(spell, idx);
-  const hasRandom = dieSides > 1;
-
-  // In WoW data, EffectBasePoints already holds the deterministic amount.
-  // Die sides only adds a random spread when it exceeds one. Avoid the +1
-  // TrinityCore server-side offset here to keep tooltips identical to client
-  // strings.
-  const min = base;
-  const max = base + (hasRandom ? dieSides - 1 : 0);
-
-  const valueForTooltip = hasRandom ? max : min;
-  const display = Math.abs(valueForTooltip);
-
-  return { min, max, display };
-};
-
-const getProcChance = (spell: ApiSpellRow | undefined): number => {
-  if (!spell) return 0;
-
-  const chance = toNum(spell.ProcChance ?? spell.procChance ?? 0, 0);
-  const ppm = toNum(spell.ProcBasePPM ?? spell.procBasePPM ?? 0, 0);
-
-  if (chance > 0) return chance;
-  if (ppm > 0) return ppm;
-  return 0;
-};
-
-const getProcCharges = (spell: ApiSpellRow | undefined): number => {
-  if (!spell) return 0;
-  return toNum(spell.ProcCharges ?? spell.procCharges ?? 0, 0);
-};
-
-const getStackAmount = (spell: ApiSpellRow | undefined): number => {
-  if (!spell) return 0;
-  return toNum(
-    spell.StackAmount ?? spell.stackAmount ?? spell.CumulativeAura ?? spell.cumulativeAura ?? 0,
-    0
-  );
-};
-
-const getChainTargets = (spell: ApiSpellRow | undefined, idx: number): number => {
-  if (!spell) return 0;
-
-  const a = spell[`EffectChainTarget_${idx}`];
-  const b = spell[`EffectChainTarget${idx}`];
-  return toNum(a ?? b ?? 0, 0);
-};
-
-const getEffectDisplayValue = (
-  spell: ApiSpellRow | undefined,
-  idx: number
-): { min: number; max: number; display: number } => {
-  const basePlusOne = getBasePointsPlusOne(spell, idx);
-  const dieSides = getEffectDiceSides(spell, idx);
-
   const hasRandom = dieSides > 0;
-  const max = basePlusOne + (hasRandom ? dieSides : 0);
-  const min = basePlusOne;
+
+  // TrinityCore uses basePoints + rand(0..dieSides) (+1 when dieSides == 0).
+  // For tooltips we surface the upper bound when randomness exists so $s/$m
+  // tokens match the in-game expectation of showing the highest roll.
+  const min = base + (dieSides === 0 ? 1 : 0);
+  const max = base + (hasRandom ? dieSides : 0);
 
   const valueForTooltip = hasRandom ? max : min;
   const display = Math.abs(valueForTooltip);
