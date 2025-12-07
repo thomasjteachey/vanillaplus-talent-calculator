@@ -12,6 +12,25 @@ import arrowRightDownGold from "../assets/arrows/right-down--gold.png";
 
 import { Position, ArrowDir } from "../TalentContext";
 
+const positionToCoords = (pos: Position) => {
+  const row = pos.charCodeAt(0) - "a".charCodeAt(0) + 1;
+  const col = Number(pos.slice(1));
+
+  return { row, col };
+};
+
+const getGridArea = (from: Position, to: Position) => {
+  const { row: fromRow, col: fromCol } = positionToCoords(from);
+  const { row: toRow, col: toCol } = positionToCoords(to);
+
+  const rowStart = Math.min(fromRow, toRow);
+  const rowEnd = Math.max(fromRow, toRow) + 1;
+  const colStart = Math.min(fromCol, toCol);
+  const colEnd = Math.max(fromCol, toCol) + 1;
+
+  return `${rowStart} / ${colStart} / ${rowEnd} / ${colEnd}`;
+};
+
 const imageMap = {
   left: arrowLeft,
   "left--gold": arrowLeftGold,
@@ -38,7 +57,7 @@ export const Arrow: React.FC<Props> = ({ dir, from, to, active }) => {
   return (
     <div
       className={`Arrow-container Arrow-container--${dir}`}
-      style={{ gridArea: `${from} / ${from} / ${to} / ${to}` }}
+      style={{ gridArea: getGridArea(from, to) }}
     >
       <div
         className={`Arrow Arrow--${dir}`}

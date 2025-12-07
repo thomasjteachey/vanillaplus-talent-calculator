@@ -32,14 +32,25 @@ export const TalentTooltip = React.forwardRef<HTMLDivElement, Props>(
     const prereqMet = isPrereqMet(state, data, tree, name);
     const unlocked = isTalentUnlocked(state, data, tree, name);
 
-    const renderDescription = (desc: { header?: string; text: string }) => (
-      <>
-        {desc.header && (
-          <p className="TalentTooltip-spellHeader">{desc.header}</p>
-        )}
-        <p className="TalentTooltip-description">{desc.text}</p>
-      </>
-    );
+    const renderDescription = (desc: { header?: string; text: string }) => {
+      const textWithBreaks = desc.text
+        .split(/\r\n|\r|\n/g)
+        .map((line, i, arr) => (
+          <React.Fragment key={`${line}-${i}`}>
+            {line}
+            {i < arr.length - 1 && <br />}
+          </React.Fragment>
+        ));
+
+      return (
+        <>
+          {desc.header && (
+            <p className="TalentTooltip-spellHeader">{desc.header}</p>
+          )}
+          <p className="TalentTooltip-description">{textWithBreaks}</p>
+        </>
+      );
+    };
 
     return (
       <Tooltip ref={ref} contentClassName="TalentTooltip-content" {...rest}>
