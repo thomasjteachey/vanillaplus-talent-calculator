@@ -310,7 +310,7 @@ $spellsById = array();
 fetch_spells_into_map($mysqli, $SPELL_TABLE, $SPELLICON_TABLE, $spellIdsList, $spellsById);
 
 // 5) Second-pass: scan tooltip strings for numeric spell references used in tooltips.
-//   $12345s1, $12345m1, $12345d, $12345t1, $12345o1, $12345a1
+//   $12345s1, $12345m1, $12345d, $12345t1, $12345o1, $12345a1, $12345h, $12345n1, $12345u
 $referenced = array();
 foreach ($spellsById as $s) {
     $desc =
@@ -320,7 +320,7 @@ foreach ($spellsById as $s) {
 
     if (!$desc) continue;
 
-    if (preg_match_all('/\$(\d+)(?:s\d+|m\d+|d|t\d+|o\d+|a\d+)/', $desc, $m)) {
+    if (preg_match_all('/\$(\d+)(?:s\d+|m\d+|d|t\d+|o\d+|a\d+|h\d*|n\d*|u\d*)/', $desc, $m)) {
         foreach ($m[1] as $idStr) {
             $sid = (int)$idStr;
             if ($sid > 0) $referenced[$sid] = true;
