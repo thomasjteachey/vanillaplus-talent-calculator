@@ -405,10 +405,14 @@ const getEffectPointsPerResource = (
   const candidates = [
     spell[`EffectPointsPerResource_${idx}`],
     spell[`EffectPointsPerResource${idx}`],
+    spell[`EffectPointsPerCombo_${idx}`],
+    spell[`EffectPointsPerCombo${idx}`],
     spell[`EffectPointsPerComboPoint_${idx}`],
     spell[`EffectPointsPerComboPoint${idx}`],
     spell[`effectPointsPerResource_${idx}`],
     spell[`effectPointsPerResource${idx}`],
+    spell[`effectPointsPerCombo_${idx}`],
+    spell[`effectPointsPerCombo${idx}`],
     spell[`effectPointsPerComboPoint_${idx}`],
     spell[`effectPointsPerComboPoint${idx}`],
   ];
