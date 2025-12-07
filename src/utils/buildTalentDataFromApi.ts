@@ -223,9 +223,57 @@ const getEffectBasePoints = (spell: ApiSpellRow | undefined, idx: number): numbe
   return toNum(a ?? b ?? 0, 0);
 };
 
-const getBasePointsPlusOne = (spell: ApiSpellRow | undefined, idx: number): number => {
+const getEffectDisplayValue = (
+  spell: ApiSpellRow | undefined,
+  idx: number
+): { min: number; max: number; display: number } => {
   const base = getEffectBasePoints(spell, idx);
-  return base + 1;
+  const dieSides = getEffectDiceSides(spell, idx);
+  const hasRandom = dieSides > 1;
+
+  // In WoW data, EffectBasePoints already holds the deterministic amount.
+  // Die sides only adds a random spread when it exceeds one. Avoid the +1
+  // TrinityCore server-side offset here to keep tooltips identical to client
+  // strings.
+  const min = base;
+  const max = base + (hasRandom ? dieSides - 1 : 0);
+
+  const valueForTooltip = hasRandom ? max : min;
+  const display = Math.abs(valueForTooltip);
+
+  return { min, max, display };
+};
+
+const getProcChance = (spell: ApiSpellRow | undefined): number => {
+  if (!spell) return 0;
+
+  const chance = toNum(spell.ProcChance ?? spell.procChance ?? 0, 0);
+  const ppm = toNum(spell.ProcBasePPM ?? spell.procBasePPM ?? 0, 0);
+
+  if (chance > 0) return chance;
+  if (ppm > 0) return ppm;
+  return 0;
+};
+
+const getProcCharges = (spell: ApiSpellRow | undefined): number => {
+  if (!spell) return 0;
+  return toNum(spell.ProcCharges ?? spell.procCharges ?? 0, 0);
+};
+
+const getStackAmount = (spell: ApiSpellRow | undefined): number => {
+  if (!spell) return 0;
+  return toNum(
+    spell.StackAmount ?? spell.stackAmount ?? spell.CumulativeAura ?? spell.cumulativeAura ?? 0,
+    0
+  );
+};
+
+const getChainTargets = (spell: ApiSpellRow | undefined, idx: number): number => {
+  if (!spell) return 0;
+
+  const a = spell[`EffectChainTarget_${idx}`];
+  const b = spell[`EffectChainTarget${idx}`];
+  return toNum(a ?? b ?? 0, 0);
 };
 
 const getEffectDisplayValue = (
