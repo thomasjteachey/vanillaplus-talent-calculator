@@ -1,6 +1,9 @@
 .Arrow-container {
   z-index: var(--z-index-arrow);
   pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .Arrow {
@@ -13,10 +16,11 @@
 }
 
 .Arrow--left {
-  height: 100%;
-  background-size: auto var(--arrow-thickness);
-  background-repeat: no-repeat;
-  background-position: left;
+  height: var(--arrow-thickness);
+  width: 100%;
+  align-self: center;
+  background-size: 100% var(--arrow-thickness);
+  background-position: center;
 }
 
 .Arrow-container--right {
@@ -25,22 +29,25 @@
 }
 
 .Arrow--right {
-  height: 100%;
-  background-size: auto var(--arrow-thickness);
-  background-repeat: no-repeat;
-  background-position: right;
+  height: var(--arrow-thickness);
+  width: 100%;
+  align-self: center;
+  background-size: 100% var(--arrow-thickness);
+  background-position: center;
 }
 
 .Arrow-container--down {
   padding-top: calc(var(--icon-size) - var(--sp-xxxs));
   padding-bottom: calc(var(--icon-size) - var(--sp-sm));
+  justify-content: center;
 }
 
 .Arrow--down {
   height: 100%;
-  background-size: var(--arrow-thickness) auto;
+  width: var(--arrow-thickness);
+  background-size: var(--arrow-thickness) 100%;
   background-repeat: no-repeat;
-  background-position: bottom;
+  background-position: center;
 }
 
 .Arrow-container--right-down {
@@ -50,19 +57,22 @@
 
 .Arrow--right-down {
   height: 100%;
-  background-size: auto var(--arrow-thickness);
+  width: 100%;
+  background-size: contain;
   background-repeat: no-repeat;
-  background-position: right;
+  background-position: center;
 }
 
 .Arrow-container--right-down-down {
   padding-top: calc((var(--icon-size) / 2) + var(--sp-sm));
   padding-bottom: calc(var(--icon-size) - var(--sp-sm));
+  justify-content: center;
 }
 
 .Arrow--right-down-down {
   height: 100%;
-  background-size: var(--arrow-thickness) auto;
+  width: var(--arrow-thickness);
+  background-size: var(--arrow-thickness) 100%;
   background-repeat: no-repeat;
-  background-position: bottom;
+  background-position: center;
 }
