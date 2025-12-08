@@ -47,17 +47,24 @@ export const KlassTrees = withRouter<Props, React.FC<Props>>(
     }, [data, location.pathname, restoreState, treeNames.length]);
 
     useEffect(() => {
-      const match = matchPath<{ klass: string }>(location.pathname, {
+      const klassMatch = matchPath<{ klass: string }>(location.pathname, {
         path: "/:klass",
       });
-      const klass = match && match.params && match.params.klass;
+      const klass = klassMatch && klassMatch.params && klassMatch.params.klass;
+
+      const hashMatch = matchPath<{ skills: string }>(location.pathname, {
+        path: "/:klass/:skills",
+      });
+      const urlHash = hashMatch && hashMatch.params && hashMatch.params.skills;
+
       const skillHash = getHashFromState(state);
+
       if (skillHash) {
         history.replace(`/${klass}/${skillHash}`);
-      } else {
+      } else if (!urlHash || restoredHash.current) {
         history.replace(`/${klass}`);
       }
-    }, [state]);
+    }, [history, location.pathname, state]);
 
     return (
       <div className="KlassTrees-container">
