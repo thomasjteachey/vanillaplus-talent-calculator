@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { withRouter, matchPath, RouteComponentProps } from "react-router-dom";
 
 import "./KlassTrees.css";
@@ -20,6 +20,7 @@ interface Props extends RouteComponentProps {
 export const KlassTrees = withRouter<Props, React.FC<Props>>(
   ({ klass, location, history }) => {
     const { state, data, resetAll, restoreState } = useTalentContext();
+    const restoredHash = useRef<string | null>(null);
 
     const pointsLeft = getPointsLeft(state);
     const treeNames = Object.keys(data);
@@ -32,14 +33,18 @@ export const KlassTrees = withRouter<Props, React.FC<Props>>(
 
     // TODO: move this into a hook?
     useEffect(() => {
+      if (treeNames.length === 0) return;
+
       const match = matchPath<{ skills: string }>(location.pathname, {
         path: "/:klass/:skills",
       });
       const hash = match && match.params && match.params.skills;
-      if (hash) {
+
+      if (hash && restoredHash.current !== hash) {
         restoreState(getStateFromHash(data, hash));
+        restoredHash.current = hash;
       }
-    }, []);
+    }, [data, location.pathname, restoreState, treeNames.length]);
 
     useEffect(() => {
       const match = matchPath<{ klass: string }>(location.pathname, {
