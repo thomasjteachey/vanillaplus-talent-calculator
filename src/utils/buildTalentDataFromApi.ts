@@ -7,7 +7,7 @@ import { Position, ArrowDir, TalentData } from "../TalentContext";
  * Key fixes included:
  *  - $h/$n/$u (best-effort value tokens)
  *  - newline normalization for /r /n /r/n and \r \n \r\n
- *  - scaled tokens: $/10; $/100; $/1000; with BOTH:
+ *  - scaled tokens: $/2; $/10; $/100; $/1000; with BOTH:
  *      - numeric form: $/1000;$1  (your Feign Death case)
  *      - letter form:  $/1000;$s1, $/100;$m1, etc
  */
@@ -514,7 +514,7 @@ const resolveSpellDescription = (
   // 1) ULTRA-TOLERANT numeric scaled vars (YOUR CASE)
   // Matches: $/1000;$1  with any whitespace variants.
   out = out.replace(
-    /\$\/\s*(10|100|1000)\s*;\s*\$\s*(\d+)/g,
+    /\$\/\s*(2|10|100|1000)\s*;\s*\$\s*(\d+)/g,
     (m, divStr, idxStr) => {
       const div = toNum(divStr, 1);
       const idx = toNum(idxStr, 0);
@@ -537,8 +537,9 @@ const resolveSpellDescription = (
   //   $/1000;S1
   //   $/100;  $12345S2
   //   $/10;h3
+  //   $/2;u1
   out = out.replace(
-    /\$\/\s*(10|100|1000)\s*;\s*\$?\s*(\d+)?\s*([sSmMhHnNuU])\s*(\d+)/g,
+    /\$\/\s*(2|10|100|1000)\s*;\s*\$?\s*(\d+)?\s*([sSmMhHnNuU])\s*(\d+)/g,
     (m, divStr, spellIdStr, _letter, idxStr) => {
       const div = toNum(divStr, 1);
       const idx = toNum(idxStr, 0);
