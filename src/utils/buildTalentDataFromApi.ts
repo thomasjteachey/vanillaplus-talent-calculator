@@ -207,14 +207,73 @@ const formatYards = (v: number): string => {
 };
 
 // -------- Base points --------
-const getBasePointsPlusOne = (spell: ApiSpellRow | undefined, idx: number): number => {
+const getEffectDiceSides = (spell: ApiSpellRow | undefined, idx: number): number => {
+  if (!spell) return 0;
+
+  const a = spell[`EffectDieSides_${idx}`];
+  const b = spell[`EffectDieSides${idx}`];
+  return toNum(a ?? b ?? 0, 0);
+};
+
+const getEffectBasePoints = (spell: ApiSpellRow | undefined, idx: number): number => {
   if (!spell) return 0;
 
   const a = spell[`EffectBasePoints_${idx}`];
   const b = spell[`EffectBasePoints${idx}`];
-  const base = toNum(a ?? b ?? 0, 0);
+  return toNum(a ?? b ?? 0, 0);
+};
 
-  return base + 1;
+const getEffectDisplayValue = (
+  spell: ApiSpellRow | undefined,
+  idx: number
+): { min: number; max: number; display: number } => {
+  const base = getEffectBasePoints(spell, idx);
+  const dieSides = getEffectDiceSides(spell, idx);
+  const hasRandom = dieSides > 1;
+
+  // In WoW data, EffectBasePoints already holds the deterministic amount.
+  // Die sides only adds a random spread when it exceeds one. Avoid the +1
+  // TrinityCore server-side offset here to keep tooltips identical to client
+  // strings.
+  const min = base;
+  const max = base + (hasRandom ? dieSides - 1 : 0);
+
+  const valueForTooltip = hasRandom ? max : min;
+  const display = Math.abs(valueForTooltip);
+
+  return { min, max, display };
+};
+
+const getProcChance = (spell: ApiSpellRow | undefined): number => {
+  if (!spell) return 0;
+
+  const chance = toNum(spell.ProcChance ?? spell.procChance ?? 0, 0);
+  const ppm = toNum(spell.ProcBasePPM ?? spell.procBasePPM ?? 0, 0);
+
+  if (chance > 0) return chance;
+  if (ppm > 0) return ppm;
+  return 0;
+};
+
+const getProcCharges = (spell: ApiSpellRow | undefined): number => {
+  if (!spell) return 0;
+  return toNum(spell.ProcCharges ?? spell.procCharges ?? 0, 0);
+};
+
+const getStackAmount = (spell: ApiSpellRow | undefined): number => {
+  if (!spell) return 0;
+  return toNum(
+    spell.StackAmount ?? spell.stackAmount ?? spell.CumulativeAura ?? spell.cumulativeAura ?? 0,
+    0
+  );
+};
+
+const getChainTargets = (spell: ApiSpellRow | undefined, idx: number): number => {
+  if (!spell) return 0;
+
+  const a = spell[`EffectChainTarget_${idx}`];
+  const b = spell[`EffectChainTarget${idx}`];
+  return toNum(a ?? b ?? 0, 0);
 };
 
 // -------- SpellDescriptionVariables --------
@@ -296,6 +355,71 @@ const resolveSpellDescription = (
 ) => {
   if (!raw) return raw;
 
+  const getSpellId = (spell?: ApiSpellRow) =>
+    toNum(spell?.ID ?? spell?.Id ?? spell?.id ?? 0, 0);
+
+  const effectCache = new Map<string, ReturnType<typeof getEffectDisplayValue>>();
+  const procChanceCache = new Map<number, number>();
+  const procChargesCache = new Map<number, number>();
+  const stackAmountCache = new Map<number, number>();
+  const chainTargetCache = new Map<string, number>();
+
+  const getCachedEffectDisplay = (
+    spell: ApiSpellRow | undefined,
+    idx: number
+  ): ReturnType<typeof getEffectDisplayValue> => {
+    const key = `${getSpellId(spell)}:${idx}`;
+    let cached = effectCache.get(key);
+    if (!cached) {
+      cached = getEffectDisplayValue(spell, idx);
+      effectCache.set(key, cached);
+    }
+    return cached;
+  };
+
+  const getCachedProcChance = (spell: ApiSpellRow | undefined): number => {
+    const key = getSpellId(spell);
+    let cached = procChanceCache.get(key);
+    if (cached === undefined) {
+      cached = getProcChance(spell);
+      procChanceCache.set(key, cached);
+    }
+    return cached;
+  };
+
+  const getCachedProcCharges = (spell: ApiSpellRow | undefined): number => {
+    const key = getSpellId(spell);
+    let cached = procChargesCache.get(key);
+    if (cached === undefined) {
+      cached = getProcCharges(spell);
+      procChargesCache.set(key, cached);
+    }
+    return cached;
+  };
+
+  const getCachedStackAmount = (spell: ApiSpellRow | undefined): number => {
+    const key = getSpellId(spell);
+    let cached = stackAmountCache.get(key);
+    if (cached === undefined) {
+      cached = getStackAmount(spell);
+      stackAmountCache.set(key, cached);
+    }
+    return cached;
+  };
+
+  const getCachedChainTargets = (
+    spell: ApiSpellRow | undefined,
+    idx: number
+  ): number => {
+    const key = `${getSpellId(spell)}:${idx}`;
+    let cached = chainTargetCache.get(key);
+    if (cached === undefined) {
+      cached = getChainTargets(spell, idx);
+      chainTargetCache.set(key, cached);
+    }
+    return cached;
+  };
+
   const getSpell = (spellIdStr?: string) =>
     spellIdStr && String(spellIdStr).length > 0
       ? spellsById.get(toNum(spellIdStr))
@@ -316,9 +440,9 @@ const resolveSpellDescription = (
       const dv = getDescVarValue(currentSpell, idx, descVarsById);
       if (Number.isFinite(dv)) return formatScaled(dv / div);
 
-      // Fallback: map $1..3 to basepoints for now
+      // Fallback: map $1..3 to effect values for now
       if (!currentSpell || idx > MAX_EFFECTS) return m;
-      const val = getBasePointsPlusOne(currentSpell, idx);
+      const val = getCachedEffectDisplay(currentSpell, idx).display;
       return formatScaled(val / div);
     }
   );
@@ -344,7 +468,7 @@ out = out.replace(
     if (!spell) return m;
 
     // Keep consistent with Blizzard-style $s logic
-    const val = getBasePointsPlusOne(spell, idx);
+    const val = getCachedEffectDisplay(spell, idx).display;
     return formatScaled(val / div);
   }
 );
@@ -369,7 +493,7 @@ out = out.replace(
     const spell = getSpell(spellIdStr);
     if (!spell) return m;
 
-    return String(getBasePointsPlusOne(spell, idx));
+    return String(getCachedEffectDisplay(spell, idx).display);
   });
 
   // $mX / $<id>mX (best-effort = basepoints)
@@ -380,16 +504,20 @@ out = out.replace(
     const spell = getSpell(spellIdStr);
     if (!spell) return m;
 
-    return String(getBasePointsPlusOne(spell, idx));
+    return String(getCachedEffectDisplay(spell, idx).display);
   });
 
 // $h / $h1..3 / $123h1..3
 // $n / $u variants too
-// Best-effort: treat like $s-style value tokens.
+// Uses WoW rules:
+//   $h  -> proc chance / base PPM (fallback: value)
+//   $n  -> chain targets / proc charges / stacks (fallback: value)
+//   $u  -> stack amount (fallback: value)
 // IMPORTANT: index is optional -> defaults to 1
 out = out.replace(
   /\$(\d+)?\s*([hnu])\s*(\d+)?/gi,
-  (m, spellIdStr, _letter, idxStr) => {
+  (m, spellIdStr, letterRaw, idxStr) => {
+    const letter = String(letterRaw || "").toLowerCase();
     const idx = idxStr ? toNum(idxStr, 0) : 1;
     if (idx < 1 || idx > 3) return m;
 
@@ -400,7 +528,28 @@ out = out.replace(
 
     if (!spell) return m;
 
-    return String(getBasePointsPlusOne(spell, idx));
+    if (letter === "h") {
+      const chance = getCachedProcChance(spell);
+      if (chance) return String(chance);
+    }
+
+    if (letter === "n") {
+      const chainTargets = getCachedChainTargets(spell, idx);
+      if (chainTargets) return String(chainTargets);
+
+      const charges = getCachedProcCharges(spell);
+      if (charges) return String(charges);
+
+      const stacks = getCachedStackAmount(spell);
+      if (stacks) return String(stacks);
+    }
+
+    if (letter === "u") {
+      const stacks = getCachedStackAmount(spell);
+      if (stacks) return String(stacks);
+    }
+
+    return String(getCachedEffectDisplay(spell, idx).display);
   }
 );
 
@@ -445,7 +594,7 @@ out = out.replace(
     const spell = getSpell(spellIdStr);
     if (!spell) return m;
 
-    const base = getBasePointsPlusOne(spell, idx);
+    const base = getCachedEffectDisplay(spell, idx).display;
     const periodSec = getPeriodSeconds(spell, idx);
     const durationMs = getDurationMsForSpell(spell, durationsById);
 
