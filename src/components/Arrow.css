@@ -11,8 +11,8 @@
 }
 
 .Arrow-container--left {
-  padding-left: calc(var(--icon-size) - var(--sp-sm));
-  padding-right: calc(var(--icon-size) - var(--sp-xxxs));
+  padding-left: calc(var(--icon-size) / 2);
+  padding-right: calc(var(--icon-size) / 2);
 }
 
 .Arrow--left {
@@ -24,8 +24,8 @@
 }
 
 .Arrow-container--right {
-  padding-left: calc(var(--icon-size) - var(--sp-xxxs));
-  padding-right: calc(var(--icon-size) - var(--sp-sm));
+  padding-left: calc(var(--icon-size) / 2);
+  padding-right: calc(var(--icon-size) / 2);
 }
 
 .Arrow--right {
@@ -37,8 +37,8 @@
 }
 
 .Arrow-container--down {
-  padding-top: calc(var(--icon-size) - var(--sp-xxxs));
-  padding-bottom: calc(var(--icon-size) - var(--sp-sm));
+  padding-top: calc(var(--icon-size) / 2);
+  padding-bottom: calc(var(--icon-size) / 2);
   justify-content: center;
 }
 
