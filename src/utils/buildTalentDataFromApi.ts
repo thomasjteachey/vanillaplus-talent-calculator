@@ -489,11 +489,71 @@ const formatScaled = (n: number) =>
   Number.isInteger(n) ? String(n) : String(Math.round(n * 1000) / 1000);
 
 // -------- Arrow dir --------
-// We keep this intentionally conservative to avoid ArrowDir union mismatches.
-// "down" is known to be valid from previous compile errors.
-const resolveArrowDir = (): ArrowDir => "down";
+type ArrowSegment = { dir: ArrowDir; from: Position; to: Position };
+
+/**
+ * Derive arrow segments from API tier/col positions.
+ *
+ * The reference calculator uses a small set of arrow images:
+ *  - right / left
+ *  - down
+ *  - right-down (corner piece)
+ *  - right-down-down (vertical continuation aligned to the corner)
+ *
+ * When a dependent talent sits below and to the right of its prereq,
+ * we emulate the reference behavior by drawing:
+ *   1) a corner segment across the prereq row to the dependent column
+ *   2) a vertical segment down to the dependent tier.
+ */
+const buildPrereqArrows = (
+  prereq: { tier: number; col: number; pos: Position },
+  dep: { tier: number; col: number; pos: Position }
+): ArrowSegment[] | undefined => {
+  // Same slot or invalid relationship
+  if (prereq.tier === dep.tier && prereq.col === dep.col) return undefined;
+
+  // Same row: horizontal connector
+  if (prereq.tier === dep.tier) {
+    if (dep.col > prereq.col) {
+      return [{ dir: "right", from: prereq.pos, to: dep.pos }];
+    }
+    if (dep.col < prereq.col) {
+      return [{ dir: "left", from: prereq.pos, to: dep.pos }];
+    }
+    return undefined;
+  }
+
+  // Dependent above prereq is unexpected in normal talent layouts
+  if (dep.tier < prereq.tier) {
+    // Best-effort fallback: draw a vertical arrow from dep to prereq? (skip)
+    return undefined;
+  }
+
+  // Different rows
+  if (dep.col === prereq.col) {
+    // Straight down
+    return [{ dir: "down", from: prereq.pos, to: dep.pos }];
+  }
+
+  // Dependent to the right: right then down (reference-style corner)
+  if (dep.col > prereq.col) {
+    const cornerPos = toPos(prereq.tier, dep.col);
+    return [
+      { dir: "right-down", from: prereq.pos, to: cornerPos },
+      { dir: "right-down-down", from: cornerPos, to: dep.pos },
+    ];
+  }
+
+  // Dependent to the left: rare; approximate with left then down
+  const cornerPos = toPos(prereq.tier, dep.col);
+  return [
+    { dir: "left", from: prereq.pos, to: cornerPos },
+    { dir: "down", from: cornerPos, to: dep.pos },
+  ];
+};
 
 // -------- Token resolver --------
+
 const resolveSpellDescription = (
   raw: string,
   currentSpell: ApiSpellRow | undefined,
@@ -812,10 +872,10 @@ export const buildTalentDataFromApi = (api: ApiResponse): TalentData => {
   }
 
   // Build prereq lookup by talent id
-  const idToMeta: Record<number, { name: string; pos: Position }> = {};
+  const idToMeta: Record<number, { name: string; pos: Position; tier: number; col: number }> = {};
   for (let i = 0; i < normalized.length; i++) {
     const t = normalized[i];
-    if (t.id > 0) idToMeta[t.id] = { name: t.name, pos: t.pos };
+    if (t.id > 0) idToMeta[t.id] = { name: t.name, pos: t.pos, tier: t.tier, col: t.col };
   }
 
   // Group by tab without Map iteration
@@ -901,13 +961,10 @@ export const buildTalentDataFromApi = (api: ApiResponse): TalentData => {
         const pre = idToMeta[prereqTalentId];
         if (pre) {
           prereqName = pre.name;
-          arrows = [
-            {
-              dir: resolveArrowDir(),
-              from: pre.pos,
-              to: t.pos,
-            },
-          ];
+          arrows = buildPrereqArrows(
+            { tier: pre.tier, col: pre.col, pos: pre.pos },
+            { tier: t.tier, col: t.col, pos: t.pos }
+          );
         }
       }
 
