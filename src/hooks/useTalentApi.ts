@@ -13,6 +13,8 @@ export interface TalentApiResponse {
   tabs?: ApiTabRow[];
   durations?: ApiDurationRow[];
   descVars?: ApiDescVarRow[];
+  castTimes?: ApiDurationRow[];
+  ranges?: ApiDurationRow[];
   error?: string;
 }
 
