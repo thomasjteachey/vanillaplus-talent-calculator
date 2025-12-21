@@ -68,6 +68,20 @@ $SPELLDESCVAR_TABLE_CANDIDATES = array(
     'spell_description_variables'
 );
 
+$SPELLCASTTIMES_TABLE_CANDIDATES = array(
+    'spellcasttimes_lplus',
+    'spell_cast_times_lplus',
+    'spellcasttimes',
+    'spell_cast_times'
+);
+
+$SPELLRANGE_TABLE_CANDIDATES = array(
+    'spellrange_lplus',
+    'spell_range_lplus',
+    'spellrange',
+    'spell_range'
+);
+
 // Talent columns that contain spell IDs
 $TALENT_SPELL_COLUMNS = array(
     'SpellRank_1',
@@ -328,7 +342,7 @@ foreach ($spellsById as $s) {
     }
 
     // Also capture numeric spell references inside scaled tokens like $/10;12345s1
-    if (preg_match_all('/\$\s*\/\s*(?:10|100|1000)\s*;\s*\$?\s*(\d+)/i', $desc, $mScaled)) {
+    if (preg_match_all('/\$\s*\/\s*\d+\s*;\s*\$?\s*(\d+)/i', $desc, $mScaled)) {
         foreach ($mScaled[1] as $idStr) {
             $sid = (int)$idStr;
             if ($sid > 0) $referenced[$sid] = true;
@@ -366,7 +380,27 @@ if ($radTable) {
     }
 }
 
-// 8) Load SpellDescriptionVariables if available.
+// 8) Load SpellCastTimes if available.
+$castTimeTable = first_existing_table($mysqli, $SPELLCASTTIMES_TABLE_CANDIDATES);
+$castTimes = array();
+if ($castTimeTable) {
+    $resCT = $mysqli->query("SELECT * FROM `$castTimeTable`");
+    if ($resCT) {
+        $castTimes = fetch_all_assoc($resCT);
+    }
+}
+
+// 9) Load SpellRange rows if available.
+$rangeTable = first_existing_table($mysqli, $SPELLRANGE_TABLE_CANDIDATES);
+$ranges = array();
+if ($rangeTable) {
+    $resRange = $mysqli->query("SELECT * FROM `$rangeTable`");
+    if ($resRange) {
+        $ranges = fetch_all_assoc($resRange);
+    }
+}
+
+// 10) Load SpellDescriptionVariables if available.
 $descVarTable = first_existing_table($mysqli, $SPELLDESCVAR_TABLE_CANDIDATES);
 $descVars = array();
 if ($descVarTable) {
@@ -385,6 +419,8 @@ echo json_encode(
         'spells'    => array_values($spellsById),
         'durations' => $durations,
         'radii'     => $radii,
+        'castTimes' => $castTimes,
+        'ranges'    => $ranges,
         'descVars'  => $descVars,
     ),
     JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
