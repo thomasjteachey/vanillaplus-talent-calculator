@@ -184,7 +184,7 @@ const getCastTimeMsFromRow = (row?: ApiCastTimeRow): number => {
 
   for (let i = 0; i < candidates.length; i++) {
     const ms = toNum(candidates[i], 0);
-    if (ms) return ms;
+    if (ms > 0) return ms;
   }
 
   return 0;
@@ -197,7 +197,7 @@ const getCastTimeMsForSpell = (
   if (!spell) return 0;
 
   const direct = toNum(spell.CastTime ?? spell.castTime ?? 0, 0);
-  if (direct) return direct;
+  if (direct > 0) return direct;
 
   const idx = toNum(
     spell.CastTimeIndex ??
@@ -210,7 +210,7 @@ const getCastTimeMsForSpell = (
   if (idx) {
     const row = castTimesById.get(idx);
     const ms = getCastTimeMsFromRow(row);
-    if (ms) return ms;
+    if (ms > 0) return ms;
   }
 
   return 0;
@@ -312,11 +312,20 @@ const getRangeYardsForSpell = (
 
 const formatSecondsFromMs = (ms: number): string => {
   if (!ms) return "0 sec";
-  const sec = Math.round(ms / 1000);
-  if (sec < 60) return `${sec} sec`;
+
+  const sec = ms / 1000;
+  const roundToTenth = (v: number) => Math.round(v * 10) / 10;
+  const secLabel = Number.isInteger(sec) ? sec : roundToTenth(sec);
+
+  if (sec < 60) return `${secLabel} sec`;
+
   const min = Math.floor(sec / 60);
-  const rem = sec % 60;
-  return rem ? `${min} min ${rem} sec` : `${min} min`;
+  const remSec = sec - min * 60;
+  const remLabel = Number.isInteger(remSec)
+    ? remSec
+    : roundToTenth(remSec);
+
+  return remSec ? `${min} min ${remLabel} sec` : `${min} min`;
 };
 
 const powerTypeToLabel = (powerType: number): string => {
