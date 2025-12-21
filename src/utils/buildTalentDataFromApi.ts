@@ -184,7 +184,7 @@ const getCastTimeMsFromRow = (row?: ApiCastTimeRow): number => {
 
   for (let i = 0; i < candidates.length; i++) {
     const ms = toNum(candidates[i], 0);
-    if (ms) return ms;
+    if (ms > 0) return ms;
   }
 
   return 0;
@@ -197,7 +197,7 @@ const getCastTimeMsForSpell = (
   if (!spell) return 0;
 
   const direct = toNum(spell.CastTime ?? spell.castTime ?? 0, 0);
-  if (direct) return direct;
+  if (direct > 0) return direct;
 
   const idx = toNum(
     spell.CastTimeIndex ??
@@ -210,7 +210,7 @@ const getCastTimeMsForSpell = (
   if (idx) {
     const row = castTimesById.get(idx);
     const ms = getCastTimeMsFromRow(row);
-    if (ms) return ms;
+    if (ms > 0) return ms;
   }
 
   return 0;
