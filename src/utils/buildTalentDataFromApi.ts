@@ -7,7 +7,7 @@ import { Position, ArrowDir, TalentData } from "../TalentContext";
  * Key fixes included:
  *  - $h/$n/$u (best-effort value tokens)
  *  - newline normalization for /r /n /r/n and \r \n \r\n
- *  - scaled tokens: $/2; $/10; $/100; $/1000; with BOTH:
+ *  - scaled tokens: $/N; with BOTH:
  *      - numeric form: $/1000;$1  (your Feign Death case)
  *      - letter form:  $/1000;$s1, $/100;$m1, etc
  */
@@ -19,6 +19,9 @@ type ApiDurationRow = Record<string, any>;
 type ApiRadiusRow = Record<string, any>;
 type ApiDescVarRow = Record<string, any>;
 
+type ApiCastTimeRow = Record<string, any>;
+type ApiRangeRow = Record<string, any>;
+
 type ApiResponse = {
   talents: ApiTalentRow[];
   spells: ApiSpellRow[];
@@ -26,6 +29,8 @@ type ApiResponse = {
   durations?: ApiDurationRow[];
   radii?: ApiRadiusRow[];
   descVars?: ApiDescVarRow[];
+  castTimes?: ApiCastTimeRow[];
+  ranges?: ApiRangeRow[];
 };
 
 const ROW_LETTERS = ["a", "b", "c", "d", "e", "f", "g"] as const;
@@ -160,6 +165,57 @@ const formatDuration = (ms: number): string => {
   return `${min} min`;
 };
 
+// -------- Cast time helpers --------
+const getCastTimeMsFromRow = (row?: ApiCastTimeRow): number => {
+  if (!row) return 0;
+
+  const candidates = [
+    row.CastTime,
+    row.castTime,
+    row.Base,
+    row.base,
+    row.BaseCastTime,
+    row.baseCastTime,
+    row.BaseTime,
+    row.baseTime,
+    row.CastTimeMs,
+    row.castTimeMs,
+  ];
+
+  for (let i = 0; i < candidates.length; i++) {
+    const ms = toNum(candidates[i], 0);
+    if (ms) return ms;
+  }
+
+  return 0;
+};
+
+const getCastTimeMsForSpell = (
+  spell: ApiSpellRow | undefined,
+  castTimesById: Map<number, ApiCastTimeRow>,
+): number => {
+  if (!spell) return 0;
+
+  const direct = toNum(spell.CastTime ?? spell.castTime ?? 0, 0);
+  if (direct) return direct;
+
+  const idx = toNum(
+    spell.CastTimeIndex ??
+      spell.CastingTimeIndex ??
+      spell.castTimeIndex ??
+      spell.castingTimeIndex ??
+      0,
+    0,
+  );
+  if (idx) {
+    const row = castTimesById.get(idx);
+    const ms = getCastTimeMsFromRow(row);
+    if (ms) return ms;
+  }
+
+  return 0;
+};
+
 const getPeriodSeconds = (spell: ApiSpellRow | undefined, idx: number): number => {
   if (!spell) return 0;
 
@@ -204,6 +260,54 @@ const formatYards = (v: number): string => {
   if (!v) return "0";
   const rounded = Math.round(v * 100) / 100;
   return Number.isInteger(rounded) ? String(rounded) : String(rounded);
+};
+
+// -------- Range helpers --------
+const getRangeYardsFromRow = (
+  row?: ApiRangeRow,
+): { min: number; max: number } => {
+  if (!row) return { min: 0, max: 0 };
+
+  const min = toNum(
+    row.RangeMin ??
+      row.RangeMin1 ??
+      row.RangeMin_1 ??
+      row.MinRange ??
+      row.minRange ??
+      0,
+    0,
+  );
+  const max = toNum(
+    row.RangeMax ??
+      row.RangeMax1 ??
+      row.RangeMax_1 ??
+      row.MaxRange ??
+      row.maxRange ??
+      0,
+    0,
+  );
+
+  return { min, max };
+};
+
+const getRangeYardsForSpell = (
+  spell: ApiSpellRow | undefined,
+  rangesById: Map<number, ApiRangeRow>,
+): { min: number; max: number } => {
+  if (!spell) return { min: 0, max: 0 };
+
+  const minRange = toNum(spell.MinRange ?? spell.minRange ?? 0, 0);
+  const maxRange = toNum(
+    spell.MaxRange ?? spell.maxRange ?? spell.Range ?? spell.range ?? 0,
+    0,
+  );
+
+  if (maxRange) return { min: minRange, max: maxRange };
+
+  const idx = toNum(spell.RangeIndex ?? spell.rangeIndex ?? 0, 0);
+  if (idx) return getRangeYardsFromRow(rangesById.get(idx));
+
+  return { min: 0, max: 0 };
 };
 
 const formatSecondsFromMs = (ms: number): string => {
@@ -255,7 +359,11 @@ const isPassiveSpell = (spell: ApiSpellRow | undefined): boolean => {
   return (attr0 & 0x40) !== 0;
 };
 
-const buildSpellHeader = (spell: ApiSpellRow | undefined): string => {
+const buildSpellHeader = (
+  spell: ApiSpellRow | undefined,
+  rangesById: Map<number, ApiRangeRow>,
+  castTimesById: Map<number, ApiCastTimeRow>
+): string => {
   if (!spell) return "";
   if (isPassiveSpell(spell)) return "";
 
@@ -276,22 +384,14 @@ const buildSpellHeader = (spell: ApiSpellRow | undefined): string => {
     0,
   );
 
-  const minRange = toNum(spell.MinRange ?? spell.minRange ?? 0, 0);
-  const maxRange = toNum(
-    spell.MaxRange ??
-      spell.maxRange ??
-      spell.Range ??
-      spell.range ??
-      0,
-    0,
-  );
+  const range = getRangeYardsForSpell(spell, rangesById);
 
   const cooldownMs = Math.max(
     toNum(spell.RecoveryTime ?? spell.recoveryTime ?? 0, 0),
     toNum(spell.CategoryRecoveryTime ?? spell.categoryRecoveryTime ?? 0, 0),
   );
 
-  const castMs = toNum(spell.CastTime ?? spell.castTime ?? 0, 0);
+  const castMs = getCastTimeMsForSpell(spell, castTimesById);
 
   const parts: string[] = [];
 
@@ -300,10 +400,10 @@ const buildSpellHeader = (spell: ApiSpellRow | undefined): string => {
 
   if (manaPerSec) parts.push(`${manaPerSec} ${powerLabel} per sec`);
 
-  if (maxRange) {
-    const rangeLabel = minRange
-      ? `${minRange}-${maxRange} yd range`
-      : `${maxRange} yd range`;
+  if (range.max) {
+    const rangeLabel = range.min
+      ? `${range.min}-${range.max} yd range`
+      : `${range.max} yd range`;
     parts.push(rangeLabel);
   }
 
@@ -514,7 +614,7 @@ const resolveSpellDescription = (
   // 1) ULTRA-TOLERANT numeric scaled vars (YOUR CASE)
   // Matches: $/1000;$1  with any whitespace variants.
   out = out.replace(
-    /\$\/\s*(2|10|100|1000)\s*;\s*\$\s*(\d+)/g,
+    /\$\/\s*(\d+)\s*;\s*\$\s*(\d+)/g,
     (m, divStr, idxStr) => {
       const div = toNum(divStr, 1);
       const idx = toNum(idxStr, 0);
@@ -539,7 +639,7 @@ const resolveSpellDescription = (
   //   $/10;h3
   //   $/2;u1
   out = out.replace(
-    /\$\/\s*(2|10|100|1000)\s*;\s*\$?\s*(\d+)?\s*([sSmMhHnNuU])\s*(\d+)/g,
+    /\$\/\s*(\d+)\s*;\s*\$?\s*(\d+)?\s*([sSmMhHnNuU])\s*(\d+)/g,
     (m, divStr, spellIdStr, _letter, idxStr) => {
       const div = toNum(divStr, 1);
       const idx = toNum(idxStr, 0);
@@ -728,6 +828,8 @@ export const buildTalentDataFromApi = (api: ApiResponse): TalentData => {
   const durations = Array.isArray(api.durations) ? api.durations : [];
   const radii = Array.isArray(api.radii) ? api.radii : [];
   const descVars = Array.isArray(api.descVars) ? api.descVars : [];
+  const castTimes = Array.isArray(api.castTimes) ? api.castTimes : [];
+  const ranges = Array.isArray(api.ranges) ? api.ranges : [];
 
   const spellsById = new Map<number, ApiSpellRow>();
   for (let i = 0; i < spells.length; i++) {
@@ -755,6 +857,20 @@ export const buildTalentDataFromApi = (api: ApiResponse): TalentData => {
     const r = radii[i];
     const id = toNum(r.ID ?? r.Id ?? r.id);
     if (id > 0) radiiById.set(id, r);
+  }
+
+  const castTimesById = new Map<number, ApiCastTimeRow>();
+  for (let i = 0; i < castTimes.length; i++) {
+    const ct = castTimes[i];
+    const id = toNum(ct.ID ?? ct.Id ?? ct.id);
+    if (id > 0) castTimesById.set(id, ct);
+  }
+
+  const rangesById = new Map<number, ApiRangeRow>();
+  for (let i = 0; i < ranges.length; i++) {
+    const range = ranges[i];
+    const id = toNum(range.ID ?? range.Id ?? range.id);
+    if (id > 0) rangesById.set(id, range);
   }
 
   const descVarsById = new Map<number, ApiDescVarRow>();
@@ -871,7 +987,7 @@ export const buildTalentDataFromApi = (api: ApiResponse): TalentData => {
         const spell = sid ? spellsById.get(sid) : undefined;
 
         const rawDesc = getSpellDescRaw(spell) || getAuraDescRaw(spell);
-        const header = buildSpellHeader(spell);
+        const header = buildSpellHeader(spell, rangesById, castTimesById);
 
         const resolved = resolveSpellDescription(
           rawDesc,
