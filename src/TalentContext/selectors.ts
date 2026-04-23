@@ -94,11 +94,10 @@ const getBasePoints = (
   talent: string,
 ) => {
   const { reqPoints } = getTalentData(data, tree, talent);
-  // get talents which require less than or equal to these points,
-  // sum their ranks
+  // points gating for a tier should only include strictly lower tiers
   return Object.entries(getTreeTalents(data, tree)).reduce(
     (prev, [talentName, talentData]) => {
-      if (talentData.reqPoints <= reqPoints) {
+      if (talentData.reqPoints < reqPoints) {
         return prev + getTalentRank(state, tree, talentName);
       }
       return prev;
@@ -113,18 +112,31 @@ export const getTalentDependents = (
   tree: string,
   talent: string,
 ) => {
-  const basePoints = getBasePoints(state, data, tree, talent);
+  const rank = getTalentRank(state, tree, talent);
+  if (rank <= 0) {
+    return [];
+  }
+
   const treeTalents = getTreeTalents(data, tree);
+  const nextState: State = {
+    ...state,
+    [tree]: {
+      ...state[tree],
+      [talent]: rank - 1,
+    },
+  };
 
   return Object.entries(treeTalents).reduce<string[]>(
     (prev, [talentName, talentData]) => {
-      const rank = getTalentRank(state, tree, talentName);
+      const nextRank = getTalentRank(nextState, tree, talentName);
       const { prereq } = talentData;
+      const reqPointsMet =
+        getBasePoints(nextState, data, tree, talentName) >= talentData.reqPoints;
+      const prereqMet = prereq
+        ? isTalentMaxed(nextState, data, tree, prereq)
+        : true;
 
-      if (talentData.reqPoints === basePoints && rank > 0) {
-        // if the talent has req equal to base points spent, therefore 1 less point and it would be illegal
-        prev.push(talentName);
-      } else if (prereq === talent && rank > 0) {
+      if (nextRank > 0 && (!reqPointsMet || !prereqMet)) {
         prev.push(talentName);
       }
       return prev;
